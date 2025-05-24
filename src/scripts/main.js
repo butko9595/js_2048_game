@@ -1,27 +1,41 @@
-'use strict';
+const Game = require('../modules/Game.class.js');
 
-const Game = require('../modules/Game.class');
 const game = new Game();
+
+const startButton = document.querySelector('.button');
+
+function numBoard(currentGame) {
+  const state = currentGame.getState();
+  const cells = document.querySelectorAll('.field-cell');
+
+  cells.forEach((cell, index) => {
+    const row = Math.floor(index / 4);
+    const col = index % 4;
+    const value = state[row][col];
+
+    cell.className = 'field-cell';
+    cell.textContent = value || '';
+
+    if (value) {
+      cell.classList.add(`field-cell--${value}`);
+    }
+  });
+}
+
+document.querySelector('.game-score').textContent = game.getScore();
+
 const startMessage = document.querySelector('.message-start');
-const button = document.querySelector('.button');
-const gameField = document.querySelector('.game-field');
-const gameScore = document.querySelector('.game-score');
 const winMessage = document.querySelector('.message-win');
 const loseMessage = document.querySelector('.message-lose');
 
-button.addEventListener('click', () => {
-  if (button.className === 'button restart') {
-    game.restart();
-  }
+startMessage?.classList.add('hidden');
 
-  game.start();
-  updateUi();
-  winMessage.classList.add('hidden');
-  loseMessage.classList.add('hidden');
-  startMessage.classList.add('hidden');
-  button.textContent = 'Restart';
-  button.className = 'button restart';
-});
+function updateMessage() {
+  const currentStatus = game.getStatus();
+
+  winMessage?.classList.toggle('hidden', currentStatus !== 'win');
+  loseMessage?.classList.toggle('hidden', currentStatus !== 'lose');
+}
 
 document.addEventListener('keydown', (e) => {
   if (game.getStatus() !== 'playing') {
@@ -29,47 +43,34 @@ document.addEventListener('keydown', (e) => {
   }
 
   switch (e.key) {
-    case 'ArrowUp':
-      game.moveUp();
+    case 'ArrowLeft':
+      game.moveLeft();
       break;
     case 'ArrowRight':
       game.moveRight();
       break;
+    case 'ArrowUp':
+      game.moveUp();
+      break;
     case 'ArrowDown':
       game.moveDown();
       break;
-    case 'ArrowLeft':
-      game.moveLeft();
-      break;
   }
-  updateUi();
+  numBoard(game);
+  document.querySelector('.game-score').textContent = game.getScore();
+  updateMessage();
 });
 
-function updateUi() {
-  const currentState = game.getState();
-  const currentStatus = game.getStatus();
-  const boardRows = gameField.querySelectorAll('.field-row');
-
-  boardRows.forEach((row, rowIndex) => {
-    const rowCells = row.querySelectorAll('.field-cell');
-
-    rowCells.forEach((cell, colIndex) => {
-      const cellValue = currentState[rowIndex][colIndex];
-
-      cell.innerHTML = cellValue || '';
-      cell.className = 'field-cell';
-
-      if (cellValue > 0) {
-        cell.classList.add(`field-cell--${cellValue}`);
-      }
-    });
-  });
-
-  gameScore.textContent = game.getScore();
-
-  if (currentStatus === 'win') {
-    winMessage.classList.remove('hidden');
-  } else if (currentStatus === 'lose') {
-    loseMessage.classList.remove('hidden');
+startButton.addEventListener('click', () => {
+  if (startButton.classList.contains('start')) {
+    game.start();
+    startButton.classList.remove('start');
+    startButton.classList.add('restart');
+    startButton.textContent = 'Restart';
+  } else {
+    game.restart();
   }
-}
+
+  numBoard(game);
+  document.querySelector('.game-score').textContent = game.getScore();
+});

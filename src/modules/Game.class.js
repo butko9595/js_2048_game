@@ -1,31 +1,61 @@
 'use strict';
-
-const BOARD_SIZE = 4;
-const WINNING_TILE = 2048;
-const TILE_PROBABILITY = 0.9;
-
 class Game {
-  constructor(
-    initialState = [
-      [0, 0, 0, 0],
-      [0, 0, 0, 0],
-      [0, 0, 0, 0],
-      [0, 0, 0, 0],
-    ],
-  ) {
+  constructor(initialState = null) {
+    this.size = 4;
     this.score = 0;
-    this.status = 'idle';
-    this.initialState = initialState;
-    this.state = this.cloneState(this.initialState);
+    this.status = 'playing';
+    this.board = initialState || this.createEmptyBoard();
   }
 
-  // --- Public Methods ---
+  moveLeft() {
+    const move = this.makeMoves(this.board);
+
+    if (move) {
+      this.afterMove();
+    }
+  }
+  moveRight() {
+    const rev = this.board.map((row) => [...row].reverse());
+    const move = this.makeMoves(rev);
+
+    if (move) {
+      this.board = move.map((row) => row.reverse());
+      this.afterMove();
+    }
+  }
+  moveUp() {
+    this.transposeBoard();
+
+    const move = this.makeMoves(this.board);
+
+    if (move) {
+      this.transposeBoard();
+      this.afterMove();
+    } else {
+      this.transposeBoard();
+    }
+  }
+  moveDown() {
+    this.transposeBoard();
+
+    const reversed = this.board.map((row) => [...row].reverse());
+    const move = this.makeMoves(reversed);
+
+    if (move) {
+      this.board = move.map((row) => row.reverse());
+      this.transposeBoard();
+      this.afterMove();
+    } else {
+      this.transposeBoard();
+    }
+  }
+
   getScore() {
     return this.score;
   }
 
   getState() {
-    return this.state;
+    return this.board.map((row) => [...row]);
   }
 
   getStatus() {
@@ -33,200 +63,124 @@ class Game {
   }
 
   start() {
-    if (this.status === 'idle') {
-      this.status = 'playing';
-      this.addRandomTile();
-      this.addRandomTile();
-    }
+    this.score = 0;
+    this.status = 'playing';
+    this.board = this.createEmptyBoard();
+    this.addRandomTile();
+    this.addRandomTile();
   }
 
   restart() {
-    this.state = this.cloneState(this.initialState);
-    this.score = 0;
-    this.status = 'idle';
+    this.start();
   }
 
-  moveUp() {
-    this.handleMove('up');
-  }
-
-  moveDown() {
-    this.handleMove('down');
-  }
-
-  moveLeft() {
-    this.handleMove('left');
-  }
-
-  moveRight() {
-    this.handleMove('right');
-  }
-
-  // --- Core Logic ---
-  handleMove(direction) {
-    if (this.status !== 'playing') {
-      return;
-    }
-
-    const moved = this.slide(direction);
-
-    if (moved) {
-      this.addRandomTile();
-      this.updateGameStatus();
-    }
-  }
-
-  slide(direction) {
-    const originalState = this.cloneState(this.state);
-
-    switch (direction) {
-      case 'left':
-        this.state = this.slideLeft(this.state);
-        break;
-      case 'right':
-        this.state = this.slideRight(this.state);
-        break;
-      case 'up':
-        this.state = this.transpose(this.slideLeft(this.transpose(this.state)));
-        break;
-      case 'down':
-        this.state = this.transpose(
-          this.slideRight(this.transpose(this.state)),
-        );
-        break;
-    }
-
-    return !this.areStatesEqual(this.state, originalState);
-  }
-
-  slideLeft(state) {
-    return state.map((row) => this.processRow(row, true));
-  }
-
-  slideRight(state) {
-    return state.map((row) => this.processRow(row, false));
-  }
-
-  processRow(row, isLeft) {
-    const filteredRow = isLeft ? row : [...row].reverse();
-    const mergedRow = this.mergeTiles(filteredRow.filter((n) => n !== 0));
-
-    while (mergedRow.length < BOARD_SIZE) {
-      mergedRow.push(0);
-    }
-
-    return isLeft ? mergedRow : mergedRow.reverse();
-  }
-
-  mergeTiles(row) {
-    for (let i = 0; i < row.length - 1; i++) {
-      if (row[i] === row[i + 1]) {
-        row[i] *= 2;
-        row[i + 1] = 0;
-        this.score += row[i];
-      }
-    }
-
-    return row.filter((n) => n !== 0);
+  createEmptyBoard() {
+    return Array.from({ length: this.size }, () => Array(this.size).fill(0));
   }
 
   addRandomTile() {
-    const emptyTiles = this.findEmptyTiles();
+    const empty = [];
 
-    if (emptyTiles.length === 0) {
-      return;
-    }
-
-    const randomIndex = Math.floor(Math.random() * emptyTiles.length);
-    const [row, column] = emptyTiles[randomIndex];
-
-    this.state[row][column] = Math.random() < TILE_PROBABILITY ? 2 : 4;
-  }
-
-  findEmptyTiles() {
-    const emptyTiles = [];
-
-    for (let row = 0; row < BOARD_SIZE; row++) {
-      for (let col = 0; col < BOARD_SIZE; col++) {
-        if (this.state[row][col] === 0) {
-          emptyTiles.push([row, col]);
+    for (let i = 0; i < this.size; i++) {
+      for (let j = 0; j < this.size; j++) {
+        if (this.board[i][j] === 0) {
+          empty.push([i, j]);
         }
       }
     }
 
-    return emptyTiles;
+    if (empty.length === 0) {
+      return;
+    }
+
+    const [x, y] = empty[Math.floor(Math.random() * empty.length)];
+
+    this.board[x][y] = Math.random() < 0.1 ? 4 : 2;
   }
 
-  // --- Game Status Updates ---
-  updateGameStatus() {
-    if (this.hasWinningTile()) {
+  checkWin() {
+    return this.board.some((row) => row.includes(2048));
+  }
+
+  canMove() {
+    for (let i = 0; i < this.size; i++) {
+      for (let j = 0; j < this.size; j++) {
+        const res = this.board[i][j];
+
+        if (res === 0) {
+          return true;
+        }
+
+        if (i < this.size - 1 && res === this.board[i + 1][j]) {
+          return true;
+        }
+
+        if (j < this.size - 1 && res === this.board[i][j + 1]) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  makeMoves(board) {
+    let move = false;
+    const newBoard = [];
+
+    for (const row of board) {
+      let newRow = row.filter((val) => val !== 0);
+
+      for (let i = 0; i < newRow.length - 1; i++) {
+        if (newRow[i] === newRow[i + 1]) {
+          newRow[i] *= 2;
+          this.score += newRow[i];
+          newRow[i + 1] = 0;
+          i++;
+        }
+      }
+      newRow = newRow.filter((val) => val !== 0);
+
+      while (newRow.length < this.size) {
+        newRow.push(0);
+      }
+      newBoard.push(newRow);
+
+      if (!move && !this.arraysEqual(newRow, row)) {
+        move = true;
+      }
+    }
+
+    if (move) {
+      this.board = newBoard;
+    }
+
+    return move ? newBoard : null;
+  }
+
+  arraysEqual(a, b) {
+    return a.length === b.length && a.every((val, i) => val === b[i]);
+  }
+
+  afterMove() {
+    this.addRandomTile();
+
+    if (this.checkWin()) {
       this.status = 'win';
-    } else if (this.isGameOver()) {
+    } else if (!this.canMove()) {
       this.status = 'lose';
     }
   }
 
-  hasWinningTile() {
-    return this.state.some((row) => row.includes(WINNING_TILE));
-  }
+  transposeBoard() {
+    const transpose = this.createEmptyBoard();
 
-  isGameOver() {
-    const hasEmptyCells = this.state.some((row) => row.includes(0));
-
-    // Check if any two adjacent tiles can be merged (left-right, up-down)
-    const canMerge = this.state.some((row, rowIndex) => {
-      return row.some((value, colIndex) => {
-        if (value === 0) {
-          return false;
-        }
-
-        // Check right neighbor
-        if (colIndex < BOARD_SIZE - 1 && value === row[colIndex + 1]) {
-          return true;
-        }
-
-        // Check down neighbor
-        if (
-          rowIndex < BOARD_SIZE - 1 &&
-          value === this.state[rowIndex + 1][colIndex]
-        ) {
-          return true;
-        }
-
-        return false;
-      });
-    });
-
-    // Game is over if there are no empty cells and no mergeable adjacent tiles
-    return !hasEmptyCells && !canMerge;
-  }
-
-  canMergeWithNeighbor(row, col, tile) {
-    if (tile === 0) {
-      return false;
+    for (let i = 0; i < this.size; i++) {
+      for (let j = 0; j < this.size; j++) {
+        transpose[i][j] = this.board[j][i];
+      }
     }
-
-    const rightNeighbor =
-      col < BOARD_SIZE - 1 && tile === this.state[row][col + 1];
-    const downNeighbor =
-      row < BOARD_SIZE - 1 && tile === this.state[row + 1][col];
-
-    return rightNeighbor || downNeighbor;
-  }
-
-  // --- Utility Methods ---
-  cloneState(state) {
-    return state.map((row) => [...row]);
-  }
-
-  areStatesEqual(state1, state2) {
-    return state1.every((row, rowIndex) => {
-      return row.every((tile, colIndex) => tile === state2[rowIndex][colIndex]);
-    });
-  }
-
-  transpose(state) {
-    return state[0].map((_, colIndex) => state.map((row) => row[colIndex]));
+    this.board = transpose;
   }
 }
 
